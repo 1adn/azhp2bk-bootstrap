@@ -1,0 +1,80 @@
+---
+- name: Install Regolith archive keyring
+  ansible.builtin.shell: |
+    set -euo pipefail
+    wget -qO - {{ regolith_apt_key_url }} \
+      | gpg --dearmor \
+      | tee /usr/share/keyrings/regolith-archive-keyring.gpg > /dev/null
+  args:
+    creates: /usr/share/keyrings/regolith-archive-keyring.gpg
+  tags: [desktop, desktop_regolith]
+
+- name: Add Regolith apt repository (noble stable)
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/regolith.list
+    mode: "0644"
+    content: |
+      {{ regolith_apt_repo }}
+  register: regolith_repo
+  tags: [desktop, desktop_regolith]
+
+- name: Install Regolith X11 (flashback) desktop packages
+  ansible.builtin.apt:
+    name: "{{ regolith_packages }}"
+    state: present
+    update_cache: true
+  tags: [desktop, desktop_regolith]
+
+- name: Install minimal desktop packages
+  ansible.builtin.apt:
+    name: "{{ desktop_packages }}"
+    state: present
+  tags: [desktop, desktop_regolith]
+
+- name: Add Google Chrome apt key
+  when: install_google_chrome | bool
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+      | gpg --dearmor \
+      | tee /usr/share/keyrings/google-chrome.gpg > /dev/null
+  args:
+    creates: /usr/share/keyrings/google-chrome.gpg
+  tags: [desktop, desktop_regolith]
+
+- name: Add Google Chrome apt repository
+  when: install_google_chrome | bool
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/google-chrome.list
+    mode: "0644"
+    content: |
+      deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main
+  tags: [desktop, desktop_regolith]
+
+- name: Install Google Chrome
+  when: install_google_chrome | bool
+  ansible.builtin.apt:
+    name: "{{ browser_package }}"
+    state: present
+    update_cache: true
+  tags: [desktop, desktop_regolith]
+
+- name: Ensure AccountsService user dir exists
+  ansible.builtin.file:
+    path: /var/lib/AccountsService/users
+    state: directory
+    mode: "0755"
+  tags: [desktop, desktop_regolith]
+
+- name: Set default graphical session to Regolith X11
+  ansible.builtin.blockinfile:
+    path: "/var/lib/AccountsService/users/{{ workstation_user }}"
+    create: true
+    mode: "0600"
+    marker: "# {mark} ANSIBLE MANAGED REGOLITH SESSION"
+    block: |
+      [User]
+      Session={{ regolith_session_name }}
+      XSession={{ regolith_session_name }}
+      SystemAccount=false
+  tags: [desktop, desktop_regolith]

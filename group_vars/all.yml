@@ -1,0 +1,103 @@
+---
+# User / paths
+workstation_user: "{{ lookup('env', 'USER') | default('ladnjay', true) }}"
+workstation_home: "{{ lookup('env', 'HOME') | default('/home/' ~ workstation_user, true) }}"
+code_root: "{{ workstation_home }}/code"
+timezone: Asia/Kolkata
+
+code_domains:
+  - saral
+  - anuvarta
+  - devops
+  - mobile
+  - personal
+  - archive
+
+domain_subdirs:
+  - git
+  - docs
+  - local
+  - files
+
+# Desktop: Regolith X11 (flashback), not Sway/Wayland
+regolith_apt_key_url: https://archive.regolith-desktop.com/regolith.key
+regolith_apt_repo: >-
+  deb [arch=amd64 signed-by=/usr/share/keyrings/regolith-archive-keyring.gpg]
+  https://archive.regolith-desktop.com/ubuntu/stable noble v3.4
+regolith_packages:
+  - regolith-desktop
+  - regolith-session-flashback
+  - regolith-look-lascaille
+  - xdg-desktop-portal-regolith
+# AccountsService / greeter session id for X11 Regolith
+regolith_session_name: regolith
+
+desktop_packages:
+  - alacritty
+  - thunar
+  - xclip
+  - xsel
+  - maim
+  - fonts-firacode
+  - fonts-noto
+  - fonts-noto-color-emoji
+
+# Prefer a single browser — override in a local vars file if needed
+browser_package: google-chrome-stable
+install_google_chrome: true
+
+base_packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - wget
+  - gnupg
+  - git
+  - jq
+  - unzip
+  - zip
+  - openssh-client
+  - software-properties-common
+  - apt-transport-https
+  - fd-find
+  - ripgrep
+  - fzf
+  - bat
+  - tree
+  - htop
+  - tmux
+  - vim
+  - ufw
+
+devtools_apt_packages:
+  - lazygit
+
+install_docker: true
+install_mise: true
+install_azure_cli: true
+install_github_cli: true
+install_dotnet_sdk: true
+dotnet_sdk_package: dotnet-sdk-9.0
+
+mise_node_version: "22"
+
+# Mobile (CLI by default; Studio via --tags mobile_studio only if you add that path later)
+install_mobile_tooling: true
+install_android_studio: false
+flutter_sdk_root: "{{ code_root }}/mobile/sdk/flutter"
+android_cmdline_root: "{{ code_root }}/mobile/sdk/android"
+
+# Dotfiles (chezmoi)
+dotfiles_repo_url: git@github.com:1adn/hp2arch-dotfiles.git
+dotfiles_apply: true
+chezmoi_bin: /usr/local/bin/chezmoi
+
+chezmoi_data:
+  name: "{{ workstation_user }}"
+  email: ""
+  browser: chrome
+  desktop: regolith-x11
+  os_target: ubuntu-24.04
+
+# Inventory output
+inventory_path: "{{ code_root }}/devops/docs/workstation-inventory.md"

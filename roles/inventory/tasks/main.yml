@@ -1,0 +1,67 @@
+---
+- name: Ensure inventory destination directory
+  ansible.builtin.file:
+    path: "{{ inventory_path | dirname }}"
+    state: directory
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0755"
+  become: false
+  tags: [inventory]
+
+- name: Collect tool versions
+  ansible.builtin.shell: |
+    set +e
+    v() { command -v "$1" >/dev/null 2>&1 && "$@" 2>/dev/null | head -1 || echo "missing"; }
+    echo "docker=$(v docker --version)"
+    echo "mise=$(v mise --version)"
+    echo "node=$(v node --version)"
+    echo "dotnet=$(v dotnet --list-sdks | head -1)"
+    echo "az=$(v az version --output tsv 2>/dev/null | head -1; az --version 2>/dev/null | head -1)"
+    echo "gh=$(v gh --version)"
+    echo "chezmoi=$(v chezmoi --version)"
+    echo "flutter=$(v flutter --version)"
+    echo "git=$(v git --version)"
+    echo "ansible=$(v ansible-playbook --version)"
+  args:
+    executable: /bin/bash
+  become: false
+  register: tool_versions
+  changed_when: false
+  tags: [inventory]
+
+- name: Collect chezmoi source SHA
+  ansible.builtin.shell: |
+    set +e
+    if [[ -d "{{ workstation_home }}/.local/share/chezmoi/.git" ]]; then
+      git -C "{{ workstation_home }}/.local/share/chezmoi" rev-parse --short HEAD
+    else
+      echo "n/a"
+    fi
+  become: false
+  register: chezmoi_sha
+  changed_when: false
+  tags: [inventory]
+
+- name: List code domain tree
+  ansible.builtin.shell: |
+    set +e
+    if [[ -d "{{ code_root }}" ]]; then
+      find "{{ code_root }}" -maxdepth 2 -type d | sort
+    else
+      echo "(missing {{ code_root }})"
+    fi
+  become: false
+  register: code_tree
+  changed_when: false
+  tags: [inventory]
+
+- name: Write workstation inventory markdown
+  ansible.builtin.template:
+    src: workstation-inventory.md.j2
+    dest: "{{ inventory_path }}"
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0644"
+  become: false
+  tags: [inventory]

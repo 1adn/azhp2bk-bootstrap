@@ -1,0 +1,65 @@
+---
+- name: Ensure code root exists
+  ansible.builtin.file:
+    path: "{{ code_root }}"
+    state: directory
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0755"
+  become: false
+  tags: [folders]
+
+- name: Create domain roots
+  ansible.builtin.file:
+    path: "{{ code_root }}/{{ item }}"
+    state: directory
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0755"
+  loop: "{{ code_domains }}"
+  become: false
+  tags: [folders]
+
+- name: Create per-domain subdirectories
+  ansible.builtin.file:
+    path: "{{ code_root }}/{{ item.0 }}/{{ item.1 }}"
+    state: directory
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0755"
+  loop: "{{ code_domains | product(domain_subdirs) | list }}"
+  become: false
+  tags: [folders]
+
+- name: Seed local/.gitignore in each domain
+  ansible.builtin.copy:
+    dest: "{{ code_root }}/{{ item }}/local/.gitignore"
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0644"
+    content: |
+      # Machine-local secrets and overlays — never commit
+      *
+      !.gitignore
+    force: false
+  loop: "{{ code_domains }}"
+  become: false
+  tags: [folders]
+
+- name: Seed domain README stubs
+  ansible.builtin.copy:
+    dest: "{{ code_root }}/{{ item }}/docs/README.md"
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0644"
+    content: |
+      # {{ item }}
+
+      - `git/` — canonical clones
+      - `docs/` — notes and plans
+      - `local/` — gitignored secrets / overlays
+      - `files/` — bulky non-git assets
+    force: false
+  loop: "{{ code_domains }}"
+  become: false
+  tags: [folders]

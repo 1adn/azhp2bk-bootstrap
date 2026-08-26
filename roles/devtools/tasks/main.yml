@@ -1,0 +1,172 @@
+---
+- name: Install lightweight apt devtools
+  ansible.builtin.apt:
+    name: "{{ devtools_apt_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [devtools]
+
+- name: Install Docker Engine (official apt repo)
+  when: install_docker | bool
+  block:
+    - name: Docker apt key
+      ansible.builtin.shell: |
+        set -euo pipefail
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+          | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod a+r /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+
+    - name: Docker apt repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/docker.list
+        mode: "0644"
+        content: |
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Add workstation user to docker group
+      ansible.builtin.user:
+        name: "{{ workstation_user }}"
+        groups: docker
+        append: true
+  tags: [devtools]
+
+- name: Install mise
+  when: install_mise | bool
+  block:
+    - name: Download mise installer
+      ansible.builtin.get_url:
+        url: https://mise.jdx.dev/install.sh
+        dest: /tmp/mise-install.sh
+        mode: "0755"
+
+    - name: Run mise installer
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export MISE_INSTALL_PATH=/usr/local/bin/mise
+        bash /tmp/mise-install.sh
+      args:
+        creates: /usr/local/bin/mise
+
+    - name: Ensure mise config dir
+      ansible.builtin.file:
+        path: "{{ workstation_home }}/.config/mise"
+        state: directory
+        owner: "{{ workstation_user }}"
+        group: "{{ workstation_user }}"
+        mode: "0755"
+      become: false
+
+    - name: Configure default Node via mise
+      ansible.builtin.copy:
+        dest: "{{ workstation_home }}/.config/mise/config.toml"
+        owner: "{{ workstation_user }}"
+        group: "{{ workstation_user }}"
+        mode: "0644"
+        content: |
+          [tools]
+          node = "{{ mise_node_version }}"
+      become: false
+
+    - name: Install mise tools for user
+      ansible.builtin.shell: |
+        set -euo pipefail
+        export PATH="/usr/local/bin:$PATH"
+        mise install
+      args:
+        executable: /bin/bash
+      become: false
+      become_user: "{{ workstation_user }}"
+      changed_when: true
+  tags: [devtools]
+
+- name: Install Azure CLI
+  when: install_azure_cli | bool
+  block:
+    - name: Azure CLI key
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc \
+          | gpg --dearmor \
+          | tee /usr/share/keyrings/microsoft-archive-keyring.gpg > /dev/null
+      args:
+        creates: /usr/share/keyrings/microsoft-archive-keyring.gpg
+
+    - name: Azure CLI repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/azure-cli.list
+        mode: "0644"
+        content: |
+          deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-archive-keyring.gpg] https://packages.microsoft.com/repos/azure-cli/ {{ ansible_distribution_release }} main
+
+    - name: Install azure-cli package
+      ansible.builtin.apt:
+        name: azure-cli
+        state: present
+        update_cache: true
+  tags: [devtools]
+
+- name: Install GitHub CLI
+  when: install_github_cli | bool
+  block:
+    - name: GitHub CLI key
+      ansible.builtin.shell: |
+        set -euo pipefail
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+          | tee /usr/share/keyrings/githubcli-archive-keyring.gpg > /dev/null
+        chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+      args:
+        creates: /usr/share/keyrings/githubcli-archive-keyring.gpg
+
+    - name: GitHub CLI repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/github-cli.list
+        mode: "0644"
+        content: |
+          deb [arch=amd64 signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main
+
+    - name: Install gh package
+      ansible.builtin.apt:
+        name: gh
+        state: present
+        update_cache: true
+  tags: [devtools]
+
+- name: Install .NET SDK
+  when: install_dotnet_sdk | bool
+  block:
+    - name: Microsoft package repo (dotnet)
+      ansible.builtin.shell: |
+        set -euo pipefail
+        wget https://packages.microsoft.com/config/ubuntu/{{ ansible_distribution_version }}/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb
+        dpkg -i /tmp/packages-microsoft-prod.deb
+      args:
+        creates: /etc/apt/sources.list.d/microsoft-prod.list
+
+    - name: Install dotnet SDK package
+      ansible.builtin.apt:
+        name: "{{ dotnet_sdk_package }}"
+        state: present
+        update_cache: true
+  tags: [devtools]
+
+- name: Reminder — install Cursor manually if needed
+  ansible.builtin.debug:
+    msg: >-
+      Install Cursor from https://cursor.com (deb) if not already present.
+      Cursor is not apt-mirrored by this role by default.
+  tags: [devtools]

@@ -1,0 +1,72 @@
+---
+- name: Skip mobile tooling when disabled
+  when: not (install_mobile_tooling | bool)
+  ansible.builtin.debug:
+    msg: "install_mobile_tooling=false — skipping mobile role body"
+  tags: [mobile]
+
+- name: Prepare mobile SDK directories
+  when: install_mobile_tooling | bool
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0755"
+  loop:
+    - "{{ code_root }}/mobile/sdk"
+    - "{{ flutter_sdk_root | dirname }}"
+    - "{{ android_cmdline_root }}"
+  become: false
+  tags: [mobile]
+
+- name: Install KVM / Android emulator host deps
+  when: install_mobile_tooling | bool
+  ansible.builtin.apt:
+    name:
+      - unzip
+      - openjdk-17-jdk
+      - libpulse0
+      - cpu-checker
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [mobile]
+
+- name: Clone Flutter SDK (stable) if missing
+  when: install_mobile_tooling | bool
+  ansible.builtin.git:
+    repo: https://github.com/flutter/flutter.git
+    dest: "{{ flutter_sdk_root }}"
+    version: stable
+    depth: 1
+  become: false
+  tags: [mobile]
+
+- name: Note Android cmdline-tools
+  when: install_mobile_tooling | bool
+  ansible.builtin.copy:
+    dest: "{{ android_cmdline_root }}/README.md"
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0644"
+    content: |
+      # Android SDK
+
+      Install cmdline-tools from Google, then:
+
+      ```bash
+      sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      ```
+
+      Android Studio is optional (`install_android_studio` in group_vars).
+  become: false
+  tags: [mobile]
+
+- name: Warn if Android Studio requested but not automated
+  when: install_android_studio | bool
+  ansible.builtin.debug:
+    msg: >-
+      install_android_studio=true: install the official .deb/.tar from
+      https://developer.android.com/studio (not auto-fetched by this role yet).
+  tags: [mobile, mobile_studio]

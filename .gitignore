@@ -1,0 +1,9 @@
+# Ignore local overrides and editor junk
+*.retry
+.vault_pass
+group_vars/all.local.yml
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store

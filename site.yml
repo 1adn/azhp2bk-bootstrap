@@ -1,0 +1,24 @@
+---
+# azhp2bk workstation — Ubuntu 24.04 + Regolith X11
+- name: Provision local workstation
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+    - role: base
+      tags: [base]
+    - role: desktop_regolith
+      tags: [desktop, desktop_regolith]
+    - role: devtools
+      tags: [devtools]
+    - role: mobile
+      tags: [mobile]
+    - role: folders
+      tags: [folders]
+    - role: dotfiles
+      tags: [dotfiles]
+    - role: inventory
+      tags: [inventory]

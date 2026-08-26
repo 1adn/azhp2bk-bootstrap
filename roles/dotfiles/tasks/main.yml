@@ -1,0 +1,49 @@
+---
+- name: Install chezmoi
+  ansible.builtin.shell: |
+    set -euo pipefail
+    if command -v chezmoi >/dev/null 2>&1; then
+      exit 0
+    fi
+    sh -c "$(curl -fsLS get.chezmoi.io)" -- -b /usr/local/bin
+  args:
+    creates: "{{ chezmoi_bin }}"
+  tags: [dotfiles]
+
+- name: Ensure chezmoi config directory
+  ansible.builtin.file:
+    path: "{{ workstation_home }}/.config/chezmoi"
+    state: directory
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0700"
+  become: false
+  tags: [dotfiles]
+
+- name: Write chezmoi.toml machine data
+  ansible.builtin.template:
+    src: chezmoi.toml.j2
+    dest: "{{ workstation_home }}/.config/chezmoi/chezmoi.toml"
+    owner: "{{ workstation_user }}"
+    group: "{{ workstation_user }}"
+    mode: "0600"
+  become: false
+  tags: [dotfiles]
+
+- name: Apply dotfiles with chezmoi
+  when: dotfiles_apply | bool
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export PATH="/usr/local/bin:$PATH"
+    if [[ -d "{{ workstation_home }}/.local/share/chezmoi/.git" ]]; then
+      chezmoi update --apply
+    else
+      chezmoi init --apply "{{ dotfiles_repo_url }}"
+    fi
+  args:
+    executable: /bin/bash
+  become: false
+  become_user: "{{ workstation_user }}"
+  register: chezmoi_apply
+  changed_when: "'No changes' not in (chezmoi_apply.stdout | default(''))"
+  tags: [dotfiles]
